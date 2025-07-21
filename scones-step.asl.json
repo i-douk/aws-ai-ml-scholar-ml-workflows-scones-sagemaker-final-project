@@ -1,0 +1,87 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "data generation",
+  "States": {
+    "data generation": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "FunctionName": "arn:aws:lambda:us-east-1:715841370934:function:data_gen_lambda:$LATEST",
+        "Payload": {
+          "image_data": null,
+          "s3_bucket": "sagemaker-us-east-1-715841370934",
+          "s3_key": "test/bicycle_s_000513.png"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "classification"
+    },
+    "classification": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "inference threshhold",
+      "Arguments": {
+        "FunctionName": "classaification_lambda",
+        "Payload": {
+          "image_data": "$.body.image_data"
+        }
+      }
+    },
+    "inference threshhold": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "FunctionName": "inference_threshhold_lambda",
+        "Payload": {
+          "image_data": "$.body.inference"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "End": true
+    }
+  },
+  "QueryLanguage": "JSONata"
+}
